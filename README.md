@@ -1,203 +1,146 @@
 [简体中文](README.zh-CN.md) | **English**
 
-# Better Retiming — Vegas-style velocity line for Blender VSE
+# Better Retiming — Vegas Pro-style Velocity
 
 ![Velocity line demo](docs/screenshot/1.png)
 
-A pure-Python add-on for **Blender 5.2.1+** (package name `seqvel`). It overlays a
-**velocity line** on strips in the Video Sequence Editor and lets you edit playback speed
-the way Vegas Pro does — drag the whole line for a constant speed, double-click to insert
-speed points, and drag points apart to create ease-in / ease-out ramps.
+Use a Vegas Pro-style velocity line in Blender's Video Sequence Editor (VSE) as a
+replacement for the counter-intuitive native Retiming.
 
-The result is written as `speed_factor` keyframes on a **Speed Control** effect strip, so
-preview, viewport playback, render and FFmpeg export all go through Blender's **native
-pipeline**. You never need to enable native Retiming.
+Pure-Python add-on. Edits are written as `speed_factor` keyframes on a **Speed Control**
+effect strip, so rendering, preview and FFmpeg export all use the same native pipeline —
+**no need to enable native Retiming**.
 
-## Features
+Native rendering and preview behavior is unaffected.
 
-- **Direct manipulation, no edit mode** — press on a visible line or speed point and drag.
-  Clicks on empty space pass straight through, so selection, box-select, playhead and
-  spacebar playback are never hijacked.
-- **Segment-wise editing** — drag a segment to move both of its endpoints, drag the tail
-  extension to move only the last point, drag a point to change its speed and time.
-- **Four segment curve types** — Linear, Smooth, Fast, Slow. The name describes *which end
-  of the segment the change is concentrated in*, independent of whether speed rises or falls.
-- **Ctrl fine-tune** — hold Ctrl during any drag for half-speed movement; point drags also
-  freeze the time position. You can toggle it mid-drag without jumps.
-- **Right-click menus** — point menu (delete point) and segment menu (curve type).
-- **RAM preview (`Shift+B`)** — Vegas-style "build dynamic RAM preview": plays the current
-  range once to fill Blender's own VSE cache, then returns the playhead.
-- **Split with speed curve (`K`)** — divides the strip at the playhead and splits the curve
-  so both halves join seamlessly, frame for frame; the split itself is a single undo step.
-- **Per-action undo** — each drag, insert or delete is one undo step.
-- **Bilingual UI** — English by default, 中文 switchable in the sidebar; the choice is stored
-  in the add-on preferences and persists across `.blend` files.
-- **Zero frame blending** — deliberately never mixes adjacent frames; no ghosting.
+Built and tested on Blender **5.2.1**; older versions are not supported.
 
-## Installation
+## Installation / update
 
 Download the latest `seqvel-<version>.zip` from
-[Releases](https://github.com/sefFumyc/Better_Retiming/releases), then go to
-**Edit → Preferences → Add-ons → Install**, pick the zip and enable the add-on.
+[Releases](https://github.com/sefFumyc/Better_Retiming/releases), then:
 
-You can also build it yourself, or copy the `seqvel/` folder into
-`%APPDATA%\Blender Foundation\Blender\5.2\scripts\addons\`:
+Blender → Edit → Preferences → Add-ons → Install → choose the zip → enable it.
 
-```bash
-python tools/build_zip.py          # produces dist/seqvel-<version>.zip
-```
+Then restart Blender.
 
-> **After updating, make Blender reload the add-on.** Blender does not re-import modules
-> whose files changed on disk, so a reinstall alone keeps the old code in memory. Either
-> restart Blender, toggle the add-on off and on, or run **Reload Scripts** (`F3`).
-> The bottom of the sidebar panel always shows the running version (e.g. `Add-on v1.6.6`);
-> if that line is missing or stale, you are still running old code.
+## Usage
 
-## Quick start
-
-1. Open the Video Sequence Editor and select a video or image strip — the velocity line
-   appears immediately at 1.0x.
-2. Hover over the strip; the cursor becomes a pointing hand where the line can be grabbed.
-3. Press and drag. Release to commit the curve as `speed_factor` keyframes on an
-   `SPD_<strip name>` Speed Control strip.
-4. Press on empty space and the event goes to Blender untouched.
+**There is no "edit mode"** — at any time, press and drag a visible line.
 
 | Action | Effect |
 |---|---|
-| Drag a segment | Move that segment only (both endpoints together) |
-| Drag the tail extension | Move the last point only |
+| Drag a segment | Move both endpoints together |
 | Double-click a segment | Insert a speed point |
-| Drag a speed point | Change speed vertically, time horizontally (first point is x-locked) |
-| **Ctrl + drag** | Fine-tune: half the speed change; point drags freeze the time position |
-| Right-click a point | Point menu (delete point) |
+| Drag a speed point | Change speed vertically, time horizontally |
+| **Ctrl + drag (any target)** | **Fine-tune**: half the speed change (move the cursor 2px, the point moves 1px); point drags **freeze horizontal movement** (vertical only) |
+| Right-click a speed point | Point menu (currently only "Delete point") |
 | Right-click a segment | Segment menu: Linear / Smooth / Fast / Slow |
-| Right-click elsewhere on the strip | Native context menu (not intercepted) |
-| **`Shift+B`** | Build RAM preview for the current range |
-| **`K`** | Split the strip at the playhead, splitting the curve too |
-| Ctrl+Z / Ctrl+Shift+Z | Undo / redo, one action per step |
+| **`Shift+B`** | **RAM preview**: play the current range once (audio disabled) into the VSE cache |
+| Ctrl+Z / Ctrl+Shift+Z | Undo / redo per action (one step per drag / insert / delete) |
 
-### Segment curve types
+### RAM preview (`Shift+B`)
 
-The name says *where inside the segment the change happens*, not whether speed goes up or down:
+Like Vegas's Build Dynamic RAM Preview: **press once and the current range is played frame
+by frame**; when it finishes, the playhead returns to the range start, and your own playback
+of that range is smooth.
 
-| Type | Shape | Rising (100%→300%) | Falling (300%→100%) |
-|---|---|---|---|
-| Linear | Constant rate | Straight | Straight |
-| Smooth | Slow at both ends, change in the middle | S-curve | S-curve |
-| Fast | Fast start, gentle finish | Convex up | Convex down |
-| Slow | Gentle start, fast finish | Convex down | Convex up |
+Press `P`, then left-drag to box-select the range.
 
-The default type for new curves is **Smooth** (Vegas-like out-of-the-box behaviour); it is
-read once, when the curve is created, and never retroactively applied to existing curves.
+By default, `Shift+B` conflicts with Blender's default (zoom to border) shortcut. It is
+recommended to change Blender's binding to `Ctrl+B` to avoid the conflict.
 
-## How it works
+<br />
 
-- Each target strip gets one `SPD_` **Speed Control** effect strip, bound through `input_1`
-  and de-duplicated by that binding (renaming does not create duplicates).
-- Mode `speed_control='MULTIPLY'` with `use_frame_interpolate=False` — **never blend frames**.
-- The shadow curve model is the single source of truth. On commit, segments are sampled
-  according to their curve type and written as **LINEAR** keyframes. Eased segments are
-  written per frame; constant-speed segments only write their endpoints.
-- Before writing, existing native Retiming data on the input strip is reset, so the two
-  mechanisms never multiply.
-- The curve is persisted in the strip's custom property `seqvel_curve`, so it survives
-  saving and reopening the `.blend`.
-- RAM preview does not touch a single pixel: it fills Blender's own VSE cache, so preview,
-  render and export stay on the same path.
+### Default curve type for new curves (panel dropdown)
 
-Detailed rationale lives in `docs/adr/` and `research/`.
+**Default = Smooth**
 
-## Compatibility and limitations
+For a straight ramp, switch the dropdown back to "Linear".
 
-- Blender **5.2.1 or newer** (declared `blender: (5, 2, 0)`).
-- **Audio is not retimed.** Speed Control affects images only; pure audio strips are
-  rejected with an explanation, and audio on a video strip keeps its original speed and pitch.
-- **Frame sampling depends on strip type** and the panel always shows which one is active:
-  - **Scene strips → subframe rendering (stepless)**: fractional source positions are passed
-    to the renderer, so slow motion stays smooth and never ghosts.
-  - **Movie / image / movie clip → frame snap**: source positions are rounded to the nearest
-    frame, so non-integer speeds repeat or skip frames (same as native Retiming).
-- **No frame blending**, by design — blending adjacent frames just looks like ghosting.
-- On scene strips, Blender's **source image cache** rounds time before building cache keys,
-  which can drop subframe precision. The panel detects this and offers a one-click toggle for
-  that scene's raw cache. This is an upstream limitation; see
-  `research/source-image-cache-subframe.md`.
-- The first speed point is locked to the strip start and cannot be deleted.
-- Not in v1: reverse playback (negative speeds), multi-strip batch editing, Blender
-  extension-store packaging.
+If you have already edited the speed (the SPD layer has been created), this option no longer
+applies; delete the velocity line and trigger it again for the setting to take effect.
 
-## Sidebar panel
+### When speed percentages appear
 
-The sidebar tab is called **Velocity**. From top to bottom:
+- **Always** → every speed point always shows its percentage.
+- **While dragging (default)** → no numbers normally; during a drag, only the points being
+  changed are shown temporarily.
 
-1. **Language** — English / 中文, default English (stored in add-on preferences).
-2. **Settings** — hide native Retiming overlay while editing, show speed percentages,
-   default curve type for new curves, and speed scale cap (300% or 1000%).
-3. **Target strip** — the active or selected strip, with a remove button and explicit
-   reasons when no editable target exists.
-4. **RAM preview** — range and source, estimated memory, current cache state.
-5. **Warnings** — audio, scene mismatch, subframe limitations.
-6. **Diagnostics** — timeline region size, hit-test result, carrier status, curve type
-   distribution, and the running version.
+<br />
+
+## Panel (don't bother — mostly debug output)
+
+The sidebar tab is called **Velocity** (English only; Blender does not support renaming tabs
+at runtime). The panel is the only information outlet, ordered **top to bottom** — settings
+first, diagnostics last:
+
+1. **Language** — `English / 中文`, factory default English. It lives in the add-on
+   preferences (a user property, not a project property) and persists across `.blend` files;
+   switching takes effect immediately and covers runtime text (panel, context menus including
+   the four segment type names, notices and reports). Text fixed at registration time (the
+   sidebar label `Velocity`, menu titles, operator and setting tooltips) cannot be switched
+   at runtime, so it stays bilingual English/Chinese; the sidebar label itself is English only
+   as requested.
+2. **Settings** — **Display** (hide the native Retiming display while editing, show speed
+   percentages) and **New curve** (default segment curve type, **speed display cap** 300% /
+   1000%).
+3. **Target strip** — the active strip (active first, then the selected source strip) and a
+   delete button; when no usable target exists the panel explains why (how many strips are in
+   the scene, how many are selected, which one is active) instead of just showing "(None)";
+   failures when reading the strip list or active strip print the exception text (not
+   swallowed silently). Selecting an audio/effect strip or another non-editable strip states
+   the reason directly.
+4. **RAM preview** — this range (with its source: preview range / scene range), roughly how
+   many MB it needs and the current cap, plus what is currently available (not built /
+   building with percentage / built to frame N and cache size / memory full / stopped early /
+   invalidated / aborted).
+5. **Status warnings** — editing/audio notices, scene source mismatch, subframe limitations.
+6. **Debug area (bottom)** — always shows `timeline region <size> · hit <result>` while
+   editing (to tell at a glance whether nothing was hit or something was hit but did not
+   move), carrier status, segment type distribution, and version.
+
+When the carrier input is a scene source, the panel also always shows this scene's raw cache
+state: when subframe precision is swallowed by it, it shows "subframe limited" with a
+one-click toggle (changes only when clicked, click again to restore).
 
 ## Development
 
-The code is layered; do not skip layers:
+Layered (do not skip layers):
 
 ```
 seqvel/curve.py        pure-Python shadow model (single source of truth, no bpy)
 seqvel/geometry.py     strip coordinate mapping and hit testing (pure Python)
 seqvel/rules.py        strip type rules (pure Python)
 seqvel/regions.py      locate the timeline region (pure Python) — context.region is unreliable
-seqvel/editing.py      interaction primitives: double-click, right-click targets
-seqvel/ram.py          RAM preview rules: range, memory budget, watermark
+seqvel/editing.py      interaction primitives: double-click detection, right-click targets (pure Python)
+seqvel/ram.py          RAM preview rules: range / memory accounting / watermark decision, no bpy
 seqvel/store.py        model cache and persistence (strip custom properties)
-seqvel/carrier.py      landing: Speed Control strip + speed_factor keyframes
-seqvel/watch.py        strip span listener: end carry, carrier re-landing, preview invalidation
-seqvel/preview.py      RAM preview operator (Shift+B)
+seqvel/carrier.py      landing mapping: Speed Control + speed_factor keyframes
+seqvel/watch.py        strip span listener: end carry / point swallow, carrier re-landing (frame map rebuild), RAM preview invalidation (ADR-0004 revision R1)
+seqvel/preview.py      RAM preview build operator (Shift+B, ADR-0011)
 seqvel/overlay.py      overlay drawing (draw handler + gpu/blf)
 seqvel/hover.py        hover cursor (MOUSEMOVE keymap → HAND_POINT)
-seqvel/interaction.py  modal operators and point / segment menus
-seqvel/status.py       runtime state: single exit for panel text and diagnostics
+seqvel/interaction.py  direct-manipulation modal operators and point / segment menus
+seqvel/status.py       runtime state (single exit for panel text and diagnostics)
 seqvel/ui.py           sidebar panel and settings
 ```
 
-`seqvel/__init__.py` must not touch `bpy` at module level (not even decorators), because the
-pure-Python test path imports the package with `bpy = None`.
+`curve` / `geometry` / `rules` / `regions` / `editing` / `ram` are bpy-free layers; `store` /
+`watch` have their own `try: import bpy` fallback — so these layers can be run under plain
+Python without Blender. The corresponding hard constraint is that `seqvel/__init__.py`
+**must not touch bpy at module level** (not even decorators), otherwise even
+`import seqvel` fails under pure Python; `persistent` app handlers are attached during
+`register()`.
 
-Run the full suite with Blender's bundled Python (replace `blender` with your install path):
-
-```bash
-blender --factory-startup --background --python tests/run_tests.py
-```
-
-Fast path without Blender (skips bpy-dependent cases by `HAVE_BPY`):
-
-```bash
-python tests/run_tests.py
-```
-
-GUI smoke test (opens a temporary Blender window, expands the VSE sidebar, no input injected):
-
-```bash
-blender --factory-startup --python tools/gui_smoke.py -- --report %TEMP%\seqvel_gui_smoke.txt
-```
-
-Static check for undefined names:
-
-```bash
-python tools/check_undefined_names.py   # requires pyflakes
-```
-
-`dist/` and `__pycache__` are not committed. Packaging check:
-`python tools/build_zip.py --check`.
+<br />
 
 ## Documentation
 
-- [`CONTEXT.md`](CONTEXT.md) — domain glossary (speed line, speed point, segment, shadow
-  model, speed carrier, and more)
-- [`docs/adr/`](docs/adr/) — architecture decision records
-- [`research/`](research/) — upstream data model, source image cache, and interaction notes
+- `CONTEXT.md` — domain glossary (speed line, speed point, segment, shadow model, speed
+  carrier, and more)
+- `docs/adr/` — architecture decision records (11 so far)
+- `research/` — upstream data model, source image cache, and drawing interaction notes
 
 ## License
 
